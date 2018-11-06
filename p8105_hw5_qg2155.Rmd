@@ -33,12 +33,25 @@ load_study_data = function(file) {
   df
 }
 
-study_data = map(list.files(path = "./data"), load_study_data)
+study_data = map_dfr(list.files(path = "./data"), load_study_data)
 
 study_data
 
 ```
 
+### Plot
+```{r}
+study_data %>% 
+  group_by(arm_type) %>% 
+  ggplot(aes(x = week, y = observed_data, color = arm_type)) +
+  geom_line() +
+  labs(
+    title = "Observations of each subject over time",
+    x = "Week",
+    y = "Observed Data"
+  )
+```
 
+This spaghetti plot shows that at week 1, there is no distinction between the control and experimental group because the observed line only has one color. This makes sense because the participants just started their treatment so the results of the experimental group can not yet be seen. Participants in the experimental group at week 1 should be very similar to those in the control group. As the number of weeks progress, we can start to see the observed data for control increase whereas the experimental group decreases. This could possibly mean that the conditions in the control group are getting worse whereas those in the experimental group are improving. At weeks 7 and 8, there is a distinction between the experimental and control group because the two colored lines are no longer overlapping. The differences between the two groups are also growing because the gap between the two lines got bigger in week 8 compared to week 7. 
 
 
