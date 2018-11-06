@@ -9,15 +9,27 @@ output: github_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r library}
+```{r library, include = FALSE}
 library(tidyverse)
+library(httr)
+```
+
+```{r page set up, include = FALSE}
+knitr::opts_chunk$set(
+  fig.width = 6,
+  fig.asp = .6,
+  out.width = "90%"
+)
+
+theme_set(theme_bw() + theme(legend.position = "bottom"))
+
 ```
 
 ## Question 1
 
 ### Importing and cleaning the dataset
 
-```{r function}
+```{r function, message = FALSE}
 load_study_data = function(file) {
   df = read_csv(paste("./data", file, sep = "/")) %>% 
     janitor::clean_names() %>%
@@ -34,13 +46,16 @@ load_study_data = function(file) {
 }
 
 study_data = map_dfr(list.files(path = "./data"), load_study_data)
-
-study_data
-
 ```
 
+```{r view study data}
+study_data
+```
+
+This dataset has `r nrow(study_data)` rows of observed data and `r ncol(study_data)` variables. There are a total of 20 participants, in which 10 are in the experimental group and 10 in control group. The variable participant_id shows the study arm that the participant belongs to and their id number in their study arm. I also created a study arm variable to make it easier to group the participants by their treatment group. The week variable shows the weeks 1 to 8 and the observed data shows the collected data for each participant for every week. 
+
 ### Plot
-```{r}
+```{r plot}
 study_data %>% 
   group_by(arm_type) %>% 
   ggplot(aes(x = week, y = observed_data, color = arm_type)) +
@@ -54,4 +69,44 @@ study_data %>%
 
 This spaghetti plot shows that at week 1, there is no distinction between the control and experimental group because the observed line only has one color. This makes sense because the participants just started their treatment so the results of the experimental group can not yet be seen. Participants in the experimental group at week 1 should be very similar to those in the control group. As the number of weeks progress, we can start to see the observed data for control increase whereas the experimental group decreases. This could possibly mean that the conditions in the control group are getting worse whereas those in the experimental group are improving. At weeks 7 and 8, there is a distinction between the experimental and control group because the two colored lines are no longer overlapping. The differences between the two groups are also growing because the gap between the two lines got bigger in week 8 compared to week 7. 
 
+## Question 2
+
+### Importing and cleaning dataset
+
+```{r get homocide data, message = FALSE}
+url_base = "https://raw.githubusercontent.com/washingtonpost/data-homicides/master/homicide-data.csv" 
+
+homocide_data_raw = read_csv(url_base)
+
+homocide_data_raw
+```
+
+This raw dataset has `r nrow(homocide_data_raw)` rows and `r ncol(homocide_data_raw)`columns. The variables are uid, reported date, and victim data that includes last name, first name, race, age, and sex. Location related variables are city, state, lat, lon. There is also a variable called disposition that describes the results of the case. For example, a homocide is case that was closed by arrest whereas a case with sufficient evidence but an arrest was not possible (example: suspect died) is labeled as a closed case without arrest. 
+
+### Create city_state variable
+
+```{r city state}
+homocide_data = homocide_data_raw %>% 
+  mutate(city_state = paste(city,state, sep = ", "))
+```
+
+### Number of homocides and unsolved homocides for each city
+
+* Total number of homocides by city
+```{r homocides}
+homocide_data %>% 
+  filter(disposition == "Closed by arrest") %>% 
+  group_by(city_state) %>% 
+  summarize(homocide_n = n()) %>% 
+  knitr::kable()
+```
+
+* Total number of unsolved homocides by city 
+```{r}
+homocide_data %>% 
+  filter(disposition %in% c("Closed without arrest", "Open/No arrest")) %>% 
+  group_by(city_state) %>% 
+  summarize(unsolve_homocide_n = n()) %>% 
+  knitr::kable()
+```
 
