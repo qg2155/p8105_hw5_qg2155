@@ -81,7 +81,7 @@ homocide_data_raw = read_csv(url_base)
 homocide_data_raw
 ```
 
-This raw dataset has `r nrow(homocide_data_raw)` rows and `r ncol(homocide_data_raw)`columns. The variables are uid, reported date, and victim data that includes last name, first name, race, age, and sex. Location related variables are city, state, lat, lon. There is also a variable called disposition that describes the results of the case. For example, a homocide is case that was closed by arrest whereas a case with sufficient evidence but an arrest was not possible (example: suspect died) is labeled as a closed case without arrest. 
+This raw dataset has `r nrow(homocide_data_raw)` rows and `r ncol(homocide_data_raw)` columns. The variables are uid, reported date, and victim data that includes last name, first name, race, age, and sex. Location-related variables are city, state, lat, lon. There is also a variable called disposition that describes the results of the case. For example, a homocide is a case that was closed by arrest whereas a case with sufficient evidence but an arrest was not possible (example: suspect died) is labeled as a closed case without arrest. 
 
 ### Create city_state variable
 
@@ -97,16 +97,110 @@ homocide_data = homocide_data_raw %>%
 homocide_data %>% 
   filter(disposition == "Closed by arrest") %>% 
   group_by(city_state) %>% 
-  summarize(homocide_n = n()) %>% 
-  knitr::kable()
+  summarize(homocide_n = n())
 ```
 
 * Total number of unsolved homocides by city 
-```{r}
+```{r unsolved}
 homocide_data %>% 
   filter(disposition %in% c("Closed without arrest", "Open/No arrest")) %>% 
   group_by(city_state) %>% 
-  summarize(unsolve_homocide_n = n()) %>% 
-  knitr::kable()
+  summarize(unsolve_homocide_n = n()) 
 ```
+
+### Baltimore, MD
+
+```{r baltimore}
+baltimore_data = homocide_data %>% 
+  filter(city_state == "Baltimore, MD") 
+
+total_cases = baltimore_data %>% 
+  summarize(cases_n = n())
+
+b_homocide = baltimore_data %>% 
+  filter(disposition == "Closed by arrest") %>% 
+  summarize(homocide_n = n())
+
+b_unsolved_homocide = baltimore_data %>% 
+  filter(disposition %in% c("Closed without arrest", "Open/No arrest")) %>% 
+  summarize(unsolved_homocide_n = n()) 
+
+baltimore_output = prop.test(x = b_homocide$homocide_n, n = total_cases$cases_n) %>% 
+  broom::tidy() 
+
+output_estimate = baltimore_output[c(1,5,6)]
+  
+
+total_cases
+b_homocide
+b_unsolved_homocide
+baltimore_output
+output_estimate
+```
+
+Baltimore has a total of 2827 cases. Out of all the cases, 1002 of them were homocides and 1825 were unsolved homocides. 35.4% of the homocides were unsolved, with the 95% confidence interval being 33.7% to 37.2%. 
+
+### Unsolved homocides for each city 
+
+Create nested dataset using city_state
+
+```{r nest}
+city_nest = nest(homocide_data, uid:disposition)
+```
+
+Create function 
+```{r city}
+individual_city = function(data) {
+
+total_cases = data %>% 
+  summarize(cases_n = n())
+
+homocide = data %>% 
+  filter(disposition == "Closed by arrest") %>% 
+  summarize(homocide_n = n())
+
+unsolved_homocide = data %>% 
+  filter(disposition %in% c("Closed without arrest", "Open/No arrest")) %>% 
+  summarize(unsolved_homocide_n = n()) 
+
+output = prop.test(x = homocide$homocide_n, n = total_cases$cases_n) %>% 
+  broom::tidy() 
+
+tibble(
+  estimate = output[[1]],
+  upper_ci = output[[5]],
+  lower_ci = output[[6]]
+)
+}
+```
+
+```{r homocide results}
+city_results =
+  city_nest %>% 
+  mutate(city_homocide = map(city_nest$data, individual_city)) %>% 
+  unnest(city_homocide)
+
+city_results
+```
+
+Create plot of homocide by city
+
+```{r homocide plot}
+city_results %>% 
+  ggplot(aes(x = city_state, y = estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci)) +
+  labs(
+    title = "Proportion of homocide by city",
+    x = "City",
+    y = "Homocide Proportion"
+  ) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+This graph shows the proportion of homocides for 51 different cities. The proportion of homocide are mostly between 25 to 75 percent, with the exception of a couple of outliers. The city Tulsa, AL only has one data point and is the biggest outlier in the dataset so it could have been a mistake. After googling, it appears that there is no city named Tulsa in AL. 
+
+Out of all cities, Chicago has the lowest proportion of homocide with a very narrow confidence interval. New Orleans and Baltimore are both runner ups for low proportion of homocide. This means that out of all the cases that happened in these cities, a very low proportion (25% - 37.5%) of cases were considered homocides (closed with arrest). A majority of cases in these cities closed with no arrest or were still open. 
+
+
 
