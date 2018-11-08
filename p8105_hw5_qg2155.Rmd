@@ -39,7 +39,8 @@ load_study_data = function(file) {
            arm_type = str_replace(arm_type, "con", "control"),
            arm_type = str_replace(arm_type, "exp", "experimental"),
            participant_id = str_replace(participant_id, ".csv", ""),
-           week = str_replace(week, "week_", "")) %>% 
+           week = str_replace(week, "week_", ""),
+           week = as.numeric(week)) %>% 
     select(participant_id, arm_type, week, observed_data)
   
   df
@@ -57,17 +58,18 @@ This dataset has `r nrow(study_data)` rows of observed data and `r ncol(study_da
 ### Plot
 ```{r plot}
 study_data %>% 
-  group_by(arm_type) %>% 
-  ggplot(aes(x = week, y = observed_data, color = arm_type)) +
-  geom_line() +
-  labs(
-    title = "Observations of each subject over time",
-    x = "Week",
-    y = "Observed Data"
-  )
+  group_by(participant_id) %>% 
+  ggplot(aes(x = week, y = observed_data, color = participant_id)) +
+    facet_grid(.~arm_type) +
+    geom_line() +
+    labs(
+      title = "Observations of each subject over time",
+      x = "Week",
+      y = "Observed Data"
+    )
 ```
 
-This spaghetti plot shows that at week 1, there is no distinction between the control and experimental group because the observed line only has one color. This makes sense because the participants just started their treatment so the results of the experimental group can not yet be seen. Participants in the experimental group at week 1 should be very similar to those in the control group. As the number of weeks progress, we can start to see the observed data for control increase whereas the experimental group decreases. This could possibly mean that the conditions in the control group are getting worse whereas those in the experimental group are improving. At weeks 7 and 8, there is a distinction between the experimental and control group because the two colored lines are no longer overlapping. The differences between the two groups are also growing because the gap between the two lines got bigger in week 8 compared to week 7. 
+This spaghetti plot shows that the control group has overall lower observation values than the experimental group. This could be the health condition of controls are worse than those who are in the experimental group. Overall, the experimental group has an upward trend. This means that the treatment they are taking is helping to improve their conditions over time. The control group, however, mostly remained around the same observed values even with a little bit of a downward trend. This means that the control group's conditions remain constant over time, with some even getting worse. 
 
 ## Question 2
 
@@ -125,7 +127,7 @@ b_unsolved_homocide = baltimore_data %>%
   filter(disposition %in% c("Closed without arrest", "Open/No arrest")) %>% 
   summarize(unsolved_homocide_n = n()) 
 
-baltimore_output = prop.test(x = b_homocide$homocide_n, n = total_cases$cases_n) %>% 
+baltimore_output = prop.test(x = b_unsolved_homocide$unsolved_homocide_n, n = total_cases$cases_n) %>% 
   broom::tidy() 
 
 output_estimate = baltimore_output[c(1,5,6)]
@@ -138,7 +140,7 @@ baltimore_output
 output_estimate
 ```
 
-Baltimore has a total of 2827 cases. Out of all the cases, 1002 of them were homocides and 1825 were unsolved homocides. 35.4% of the homocides were unsolved, with the 95% confidence interval being 33.7% to 37.2%. 
+Baltimore has a total of 2827 cases. Out of all the cases, 1002 of them were homocides and 1825 were unsolved homocides. 64.6 4% of the homocides were unsolved, with the 95% confidence interval being 62.8% to 66.3%. 
 
 ### Unsolved homocides for each city 
 
@@ -163,7 +165,7 @@ unsolved_homocide = data %>%
   filter(disposition %in% c("Closed without arrest", "Open/No arrest")) %>% 
   summarize(unsolved_homocide_n = n()) 
 
-output = prop.test(x = homocide$homocide_n, n = total_cases$cases_n) %>% 
+output = prop.test(x = unsolved_homocide$unsolved_homocide_n, n = total_cases$cases_n) %>% 
   broom::tidy() 
 
 tibble(
@@ -174,7 +176,7 @@ tibble(
 }
 ```
 
-```{r homocide results}
+```{r unsolved homocide results}
 city_results =
   city_nest %>% 
   mutate(city_homocide = map(city_nest$data, individual_city)) %>% 
@@ -185,22 +187,19 @@ city_results
 
 Create plot of homocide by city
 
-```{r homocide plot}
+```{r unsolved homocide plot}
 city_results %>% 
   ggplot(aes(x = city_state, y = estimate)) +
   geom_point() +
   geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci)) +
   labs(
-    title = "Proportion of homocide by city",
+    title = "Proportion of unsolved homocide by city",
     x = "City",
-    y = "Homocide Proportion"
+    y = "Unsolved Homocide Proportion"
   ) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 
-This graph shows the proportion of homocides for 51 different cities. The proportion of homocide are mostly between 25 to 75 percent, with the exception of a couple of outliers. The city Tulsa, AL only has one data point and is the biggest outlier in the dataset so it could have been a mistake. After googling, it appears that there is no city named Tulsa in AL. 
+This graph shows the proportion of unsolved homocides for 51 different cities. The proportion of unsolved homocide are mostly between 25 to 75 percent. The city Tulsa, AL only has one data point and is the biggest outlier in the dataset so it could have been a mistake in creating the dataset. After googling, it appears that there is no city named Tulsa in AL. 
 
-Out of all cities, Chicago has the lowest proportion of homocide with a very narrow confidence interval. New Orleans and Baltimore are both runner ups for low proportion of homocide. This means that out of all the cases that happened in these cities, a very low proportion (25% - 37.5%) of cases were considered homocides (closed with arrest). A majority of cases in these cities closed with no arrest or were still open. 
-
-
-
+Out of all cities, Chicago has the highest unsolved proportion of homocide with a very narrow confidence interval. New Orleans and Baltimore are both runner ups for high proportion of unsolved homocide. This means that a majority of cases in these cities closed with no arrest or were still open. 
